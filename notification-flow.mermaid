@@ -1,0 +1,33 @@
+flowchart TD
+    subgraph "Publishing Flow"
+        A[User Action] -->|Triggers| B[publishMessage]
+        B -->|Publishes to| C[notificationCenter Topic]
+        C -->|Triggers| D[Cloud Function]
+        D -->|Process Event| E{Event Type}
+        E -->|likesOnPost| F1[Handle Post Likes]
+        E -->|likesOnComment| F2[Handle Comment Likes]
+        E -->|commentOnPost| F3[Handle Post Comments]
+        E -->|follow| F4[Handle Follows]
+        E -->|commentOnMandiPost| F5[Handle Mandi Comments]
+        
+        F1 & F2 & F3 & F4 & F5 -->|Update| G[Firebase DB]
+        F1 & F2 & F3 & F4 & F5 -->|Send| H[External API]
+    end
+
+    subgraph "Retrieval Flow"
+        I[Client Request] -->|Triggers| J[getNotifications Function]
+        J -->|Fetch| K1[Chat Notifications]
+        J -->|Fetch| K2[Global Notifications]
+        J -->|Fetch| K3[Social Notifications]
+        J -->|Fetch| K4[Geographic Notifications]
+        
+        K1 & K2 & K3 & K4 -->|Merge & Sort| L[Combined Feed]
+        L -->|Track| M[Mixpanel Analytics]
+        L -->|Return| N[Client Display]
+        
+        O[Read Status Update] -->|Triggers| P[updateNotifications]
+        P -->|5s Delay| Q[Update Last Read]
+    end
+
+    G -.->|Read| J
+    H -.->|Fetch| J
