@@ -217,12 +217,6 @@ Notifications are sent to external endpoints:
   - `/mandiComment`
   - `/mandiCommentReply`
 
-## Environment Configuration
-The system supports multiple environments:
-- Production: Uses `productionApp` Firebase instance
-- Staging: Uses `stageApp` Firebase instance
-- Meta: Uses `metaApp` Firebase instance for metadata
-
 ## Notification Retrieval Flow
 
 ## Getting Notifications
@@ -249,7 +243,7 @@ The system provides a cloud function `getNotifications` that fetches notificatio
      - Follower activities
      - Published posts
 
-4. **Geographic Notifications**
+4. **Geographic Notifications(Currently Not Used)**
    - Based on user's city and cluster
    - Retrieved from `/userProfile/{uid}/district` and `/userProfile/{uid}/geo_coded_cluster`
 
