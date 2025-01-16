@@ -38,8 +38,6 @@ flowchart TD
         P -->|5s Delay| Q[Update Last Read]
     end
 
-    G -.->|Read| J
-    H -.->|Fetch| J
 ```
 
 </details>
