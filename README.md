@@ -1,7 +1,7 @@
 # Notification Center Documentation
 
 ## System Flow Diagram
-The notification system consists of two main flows: the Publishing Flow and the Retrieval Flow. Each component in the diagram corresponds to specific functionality documented in later sections.
+The notification system consists of three main flows: the Publishing Flow, the Retrieval Flow, and the Automated Scheme Notification Flow. Each component corresponds to specific functionality documented in later sections.
 
 <details>
 <summary>Click to expand the Notification Center Flow Diagram</summary>
@@ -38,6 +38,14 @@ flowchart TD
         P -->|5s Delay| Q[Update Last Read]
     end
 
+    subgraph "Automated Scheme Notification Flow"
+        R[Cloud Scheduler] -->|Daily Trigger| S[schemes_daily_pns]
+        S -->|Fetch Posts| T[MySQL Database]
+        T -->|Filter & Process| U[Top Liked Posts]
+        U -->|For Each State| V{State Processing}
+        V -->|Create Notification| W[Webengage Service]
+        W -->|Send| X[User Segments]
+    end
 ```
 
 </details>
@@ -217,6 +225,12 @@ Notifications are sent to external endpoints:
   - `/mandiComment`
   - `/mandiCommentReply`
 
+## Environment Configuration
+The system supports multiple environments:
+- Production: Uses `productionApp` Firebase instance
+- Staging: Uses `stageApp` Firebase instance
+- Meta: Uses `metaApp` Firebase instance for metadata
+
 ## Notification Retrieval Flow
 
 ## Getting Notifications
@@ -243,7 +257,7 @@ The system provides a cloud function `getNotifications` that fetches notificatio
      - Follower activities
      - Published posts
 
-4. **Geographic Notifications(Currently Not Used)**
+4. **Geographic Notifications**
    - Based on user's city and cluster
    - Retrieved from `/userProfile/{uid}/district` and `/userProfile/{uid}/geo_coded_cluster`
 
@@ -275,3 +289,122 @@ The system provides `updateNotifications` function that:
 - Updates the user's last read timestamp
 - Includes a 5-second delay for processing
 - Updates notification read status in the database
+
+## Error Handling
+- Each notification source fetch has independent error handling
+- System returns empty array with default header on errors
+- Failed fetches don't block other notification types
+
+# Automated Scheme Notifications
+
+## Overview
+The system includes an automated notification service for scheme-related posts, implemented through the `schemes_daily_pns` Cloud Function. This service automatically sends notifications about scheme posts to users based on their state and engagement metrics.
+
+## Flow Process
+1. **Trigger**: Cloud Function runs daily to process scheme notifications
+2. **Data Collection**:
+   - Fetches state-level scheme posts from the last 24 hours
+   - Retrieves engagement metrics (likes, impressions)
+   - Filters posts based on state-specific criteria
+
+3. **Post Selection**:
+   ```python
+   def get_top_liked_posts(posts, cursor):
+       # Calculates engagement metrics
+       post_likes['like_rate'] = post_likes.no_of_likes/post_likes.no_of_impressions*100
+       # Sorts and selects top performing posts
+       post_likes = post_likes.sort_values('like_rate', ascending=False)
+   ```
+
+4. **State-wise Processing**:
+   - Each state has configured:
+     - Notification times (`STATE_NOTIF_TIMES_MAP`)
+     - User segments (`STATE_SEGMENT_MAP`)
+     - Number of daily notifications
+
+5. **Notification Creation**:
+   ```python
+   def send_notification(title, body, kvPairs, segment_id, notif_time, campaign_name):
+       payload = {
+           'campaignType': 'Automated Scheme Notification',
+           'segments': {
+               'excludedSegments': EXCLUDED_SEGMENTS,
+               'includedSegments': [segment_id]
+           },
+           'scheduledTime': pn_time,
+           'titles': [title],
+           'messages': [body]
+       }
+   ```
+
+## Database Schema
+The system utilizes two MySQL databases:
+1. **Main Database**:
+   - `posts` table: Contains post information
+   - `post_cohorts` table: Maps posts to states/clusters
+   - `post_interactions` table: Stores engagement metrics
+
+2. **UGC Database**:
+   - `ugc_posts` table: Contains user-generated content
+   - `ugc_posts_stats` table: Stores post statistics
+
+## Key Functions
+
+### 1. Post Fetching
+```python
+def fetch_state_level_scheme_posts(cursor, cursor1):
+    # Fetches posts from last 24 hours
+    # Maps posts to states
+    # Retrieves UGC content
+```
+
+### 2. Engagement Analysis
+```python
+def get_top_liked_posts(posts, cursor):
+    # Calculates engagement metrics
+    # Ranks posts by performance
+    # Returns top performing content
+```
+
+### 3. Notification Dispatch
+```python
+def send_notification(title, body, kvPairs, segment_id, notif_time, campaign_name):
+    # Creates notification payload
+    # Schedules delivery
+    # Handles targeting
+```
+
+## Error Handling
+1. **Database Connections**:
+   ```python
+   def make_connection():
+       # Handles MySQL connection setup
+       # Manages connection lifecycle
+       # Uses buffered cursors for efficiency
+   ```
+
+2. **Process Recovery**:
+   - Checks connection status before operations
+   - Reconnects if connection is lost
+   - Closes connections properly after use
+
+## Configuration
+The system uses several configuration maps:
+1. `STATE_NOTIF_TIMES_MAP`: Defines notification timings per state
+2. `STATE_SEGMENT_MAP`: Maps states to user segments
+3. `EXCLUDED_SEGMENTS`: Global exclusion list
+4. `GENERIC_PN_DETAILS`: Fallback notification content
+
+## Best Practices for Scheme Notifications
+1. Monitor engagement metrics regularly
+2. Update state segments based on user behavior
+3. Rotate notification timings for optimal engagement
+4. Test notification content across different states
+5. Maintain fallback content for low-content days
+
+# Best Practices
+1. Always include error handling when publishing messages
+2. Validate required fields before sending notifications
+3. Keep comment content under 100 characters for better display
+4. Ensure proper environment selection when deploying
+5. Monitor notification counter updates for consistency
